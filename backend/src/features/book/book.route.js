@@ -9,4 +9,8 @@ bookRouter.post("/addBook", (req, res) => {
   bookController.addBook(req, res);
 });
 
+bookRouter.get("/getAllBooks", (req, res) => {
+  bookController.getAllBooks(req, res);
+});
+
 export default bookRouter;

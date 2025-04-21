@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const bookSchema = new mongoose.Schema(
   {
-    bookTitle: {
+    title: {
       type: String,
       required: true,
       trim: true,
@@ -27,7 +27,7 @@ const bookSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    coverImageUrl: {
+    coverImage: {
       type: String,
       required: true,
     },

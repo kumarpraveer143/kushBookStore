@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Book, CartItem, User, Order, OrderStatus } from "./types";
-import { books as initialBooks } from "./data";
+// import { books as initialBooks } from "./data";
 import { useToast } from "@/components/ui/use-toast";
+import axios from "axios";
 
 interface AppContextType {
   user: User | null;
@@ -30,7 +31,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [books, setBooks] = useState<Book[]>(initialBooks);
+  const [books, setBooks] = useState<Book[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const { toast } = useToast();
 
@@ -39,7 +40,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (savedCart) {
       setCart(JSON.parse(savedCart));
     }
-    
+
     const savedUser = localStorage.getItem("bookstore-user");
     if (savedUser) {
       setUser(JSON.parse(savedUser));
@@ -54,7 +55,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem("bookstore-cart", JSON.stringify(cart));
   }, [cart]);
-  
+
   useEffect(() => {
     if (user) {
       localStorage.setItem("bookstore-user", JSON.stringify(user));
@@ -67,27 +68,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("bookstore-orders", JSON.stringify(orders));
   }, [orders]);
 
+  // useEffect(() => {
+  //   const savedBooks = localStorage.getItem("bookstore-books");
+  //   if (savedBooks) {
+  //     setBooks(JSON.parse(savedBooks));
+  //   }
+  // }, []);
+
   useEffect(() => {
-    const savedBooks = localStorage.getItem("bookstore-books");
-    if (savedBooks) {
-      setBooks(JSON.parse(savedBooks));
-    }
+    const fetchBooks = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:3000/api/book/getAllBooks"
+        );
+        setBooks(res.data.message); // Adjust if the books are in a nested property
+        localStorage.setItem(
+          "bookstore-books",
+          JSON.stringify(res.data.message)
+        );
+      } catch (error) {
+        console.error("Failed to fetch books:", error);
+      }
+    };
+
+    fetchBooks();
   }, []);
 
-  const filteredBooks = books.filter(
-    (book) =>
-      book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredBooks = books.filter((book) => {
+    const title = book.title?.toLowerCase() || "";
+    const author = book.author?.toLowerCase() || "";
+    const category = book.category?.toLowerCase() || "";
+    const query = searchQuery.toLowerCase();
+  
+    return title.includes(query) || author.includes(query) || category.includes(query);
+  });
 
   const addToCart = (bookId: string, quantity = 1) => {
     setIsLoading(true);
-    
+
     setTimeout(() => {
       setCart((prevCart) => {
         const existingItem = prevCart.find((item) => item.bookId === bookId);
-        
+
         if (existingItem) {
           return prevCart.map((item) =>
             item.bookId === bookId
@@ -98,19 +120,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return [...prevCart, { bookId, quantity }];
         }
       });
-      
+
       toast({
         title: "Added to cart",
         description: "Book has been added to your cart.",
       });
-      
+
       setIsLoading(false);
     }, 500);
   };
 
   const removeFromCart = (bookId: string) => {
     setCart((prevCart) => prevCart.filter((item) => item.bookId !== bookId));
-    
+
     toast({
       title: "Removed from cart",
       description: "Book has been removed from your cart.",
@@ -122,7 +144,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       removeFromCart(bookId);
       return;
     }
-    
+
     setCart((prevCart) =>
       prevCart.map((item) =>
         item.bookId === bookId ? { ...item, quantity } : item
@@ -135,11 +157,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const cartTotal = cart.reduce((total, item) => {
-    const book = books.find((b) => b.id === item.bookId);
+    const book = books.find((b) => b._id === item.bookId);
     return total + (book ? book.price * item.quantity : 0);
   }, 0);
 
-  const createOrder = async (items: CartItem[], shippingDetails?: any): Promise<string> => {
+  const createOrder = async (
+    items: CartItem[],
+    shippingDetails?: any
+  ): Promise<string> => {
     if (!user) {
       toast({
         title: "Authentication required",
@@ -148,7 +173,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       throw new Error("User not authenticated");
     }
-    
+
     if (items.length === 0) {
       toast({
         title: "Empty order",
@@ -157,25 +182,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       throw new Error("Order is empty");
     }
-    
+
     setIsLoading(true);
-    
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       const orderDate = new Date();
       const estimatedDelivery = new Date();
       estimatedDelivery.setDate(orderDate.getDate() + 5);
-      
+
       const orderId = `order-${Date.now()}`;
-      
+
       const itemsTotal = items.reduce((total, item) => {
-        const book = books.find((b) => b.id === item.bookId);
+        const book = books.find((b) => b._id === item.bookId);
         return total + (book ? book.price * item.quantity : 0);
       }, 0);
-      
-      const total = itemsTotal + 5 + (itemsTotal * 0.07);
-      
+
+      const total = itemsTotal + 5 + itemsTotal * 0.07;
+
       const newOrder: Order = {
         id: orderId,
         userId: user.id,
@@ -186,20 +211,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         estimatedDelivery: estimatedDelivery.toISOString(),
         shippingDetails,
       };
-      
-      setOrders(prevOrders => [...prevOrders, newOrder]);
-      
+
+      setOrders((prevOrders) => [...prevOrders, newOrder]);
+
       toast({
         title: "Order placed successfully",
         description: "Your books will be delivered soon!",
       });
-      
+
       return orderId;
     } catch (error) {
       console.error("Error placing order:", error);
       toast({
         title: "Failed to place order",
-        description: "There was a problem processing your order. Please try again.",
+        description:
+          "There was a problem processing your order. Please try again.",
         variant: "destructive",
       });
       throw error;
@@ -217,7 +243,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return null;
     }
-    
+
     if (cart.length === 0) {
       toast({
         title: "Empty cart",
@@ -226,7 +252,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return null;
     }
-    
+
     try {
       const orderId = await createOrder(cart);
       clearCart();
@@ -239,16 +265,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addBook = (book: Omit<Book, "id" | "rating" | "publishDate">) => {
     const newBook: Book = {
       ...book,
-      id: `book-${Date.now()}`,
+      _id: `book-${Date.now()}`,
       rating: 0,
-      publishDate: new Date().toISOString().split('T')[0],
+      publishDate: new Date().toISOString().split("T")[0],
     };
-    
-    setBooks(prevBooks => [...prevBooks, newBook]);
-    
-    localStorage.setItem("bookstore-books", JSON.stringify([...books, newBook]));
-    
-    return newBook.id;
+
+    setBooks((prevBooks) => [...prevBooks, newBook]);
+
+    localStorage.setItem(
+      "bookstore-books",
+      JSON.stringify([...books, newBook])
+    );
+
+    return newBook._id;
   };
 
   return (

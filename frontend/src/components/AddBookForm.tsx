@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ import { useAppContext } from "@/lib/AppContext";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const bookSchema = z.object({
   title: z.string().min(2, { message: "Title must be at least 2 characters" }),
@@ -25,7 +25,10 @@ const bookSchema = z.object({
   description: z.string().min(10, { message: "Description too short" }),
   category: z.string().min(1, { message: "Category is required" }),
   coverImage: z.string().url({ message: "Valid image URL required" }),
-  stock: z.coerce.number().int().positive({ message: "Stock must be positive" }),
+  stock: z.coerce
+    .number()
+    .int()
+    .positive({ message: "Stock must be positive" }),
 });
 
 type BookFormValues = z.infer<typeof bookSchema>;
@@ -34,7 +37,7 @@ export function AddBookForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, addBook } = useAppContext();
   const navigate = useNavigate();
-  
+
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
     defaultValues: {
@@ -57,13 +60,12 @@ export function AddBookForm() {
       });
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       // Add a small delay to simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Make sure all required fields are present when calling addBook
       const newBookId = addBook({
         title: values.title,
@@ -74,19 +76,37 @@ export function AddBookForm() {
         coverImage: values.coverImage,
         stock: values.stock,
       });
-      
-      console.log("New book created:", {
-        ...values,
-        id: newBookId,
-        rating: 0,
-        publishDate: new Date().toISOString().split('T')[0],
-      });
-      
+
+      const formData = {
+        title: values.title,
+        author: values.author,
+        price: values.price,
+        description: values.description,
+        category: values.category,
+        coverImage: values.coverImage,
+        stock: values.stock,
+      };
+
+      const res = await axios.post(
+        "http://localhost:3000/api/book/addBook",
+        formData,
+        { withCredentials: true }
+      );
+
+      console.log(res.data);
+
+      // console.log("New book created:", {
+      //   ...values,
+      //   id: newBookId,
+      //   rating: 0,
+      //   publishDate: new Date().toISOString().split('T')[0],
+      // });
+
       toast({
         title: "Book added successfully",
         description: "Your book has been added to the marketplace",
       });
-      
+
       // Reset form and redirect
       form.reset();
       navigate("/books");
@@ -119,7 +139,7 @@ export function AddBookForm() {
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="author"
@@ -133,7 +153,7 @@ export function AddBookForm() {
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="price"
@@ -147,7 +167,7 @@ export function AddBookForm() {
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="category"
@@ -155,13 +175,16 @@ export function AddBookForm() {
               <FormItem>
                 <FormLabel>Category</FormLabel>
                 <FormControl>
-                  <Input placeholder="Fiction, Sci-Fi, Fantasy, etc." {...field} />
+                  <Input
+                    placeholder="Fiction, Sci-Fi, Fantasy, etc."
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="stock"
@@ -175,7 +198,7 @@ export function AddBookForm() {
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="coverImage"
@@ -183,14 +206,17 @@ export function AddBookForm() {
               <FormItem>
                 <FormLabel>Cover Image URL</FormLabel>
                 <FormControl>
-                  <Input placeholder="https://example.com/image.jpg" {...field} />
+                  <Input
+                    placeholder="https://example.com/image.jpg"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-        
+
         <FormField
           control={form.control}
           name="description"
@@ -198,17 +224,17 @@ export function AddBookForm() {
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
-                <Textarea 
-                  placeholder="Write a description of the book" 
+                <Textarea
+                  placeholder="Write a description of the book"
                   className="min-h-32"
-                  {...field} 
+                  {...field}
                 />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        
+
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting ? "Adding Book..." : "Add Book to Marketplace"}
         </Button>
